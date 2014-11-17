@@ -14,36 +14,29 @@ import android.widget.TextView;
  * Created by tzvi on 10/31/14.
  */
 
-    public class ImageAdapter extends ArrayAdapter {
+    public class NoteAdapter extends ArrayAdapter {
         private Context mContext;
         private String[] MnoteString;
 
 
-     public ImageAdapter(Context context, int resource,String[] noteString ) {
-       super(context, resource, noteString);
+     public NoteAdapter(Context context, int resource) {
+       super(context, resource);
         mContext=context;
-        MnoteString = noteString;
+
 
      }
 
 
-    public int getCount() {
-            return MnoteString.length;
-        }
 
-        public Object getItem(int position) {
-            return null;
-        }
 
-        public long getItemId(int position) {
-            return 0;
-        }
+
 
         // create a new ImageView for each item referenced by the Adapter
         public View getView(int position, View convertView, ViewGroup parent) {
             LayoutInflater inflater = (LayoutInflater) mContext
                     .getSystemService(Context.LAYOUT_INFLATER_SERVICE);
             View gridView;
+            String note =(String)getItem(position);
             if (convertView == null) {  // if it's not recycled, initialize some attributes
 
                 gridView = new View(mContext);
@@ -54,7 +47,7 @@ import android.widget.TextView;
                 // set value into textview
                 TextView textView = (TextView) gridView
                         .findViewById(R.id.grid_item);
-                textView.setText(MnoteString[position]);
+                textView.setText(note);
 
                 } else {
                 gridView = (View) convertView;
