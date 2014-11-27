@@ -44,7 +44,7 @@ import java.util.ArrayList;
             HttpURLConnection connection= null;
             try {
                 if (adapter!=null){
-                    url = new URL("http://162.243.45.239/OneNote/retrieveNotes.php");
+                    url = new URL("http://162.243.45.239/OneNote/retrievNotes.php");
                     urlParameters ="email=example2@yahoo.com";
                     Log.v("url",url.toString());
                 }

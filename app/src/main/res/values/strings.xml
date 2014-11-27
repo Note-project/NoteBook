@@ -6,5 +6,7 @@
     <string name="action_settings">Settings</string>
     <string name="title_activity_index_page">IndexPage</string>
     <string name="addnote">Add new note</string>
+    <string name="sighn_in_mine">sighn in</string>
+    <string name="register_mine">register</string>
 
 </resources>
