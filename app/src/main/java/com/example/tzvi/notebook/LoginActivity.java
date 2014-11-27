@@ -17,6 +17,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.provider.ContactsContract;
 import android.text.TextUtils;
+import android.util.Log;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.View.OnClickListener;
@@ -26,9 +27,17 @@ import android.widget.AutoCompleteTextView;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
+
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GooglePlayServicesUtil;
 import com.google.android.gms.common.SignInButton;
+
+import java.io.BufferedReader;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
@@ -42,7 +51,7 @@ import java.util.regex.Pattern;
  * https://developers.google.com/+/mobile/android/getting-started#step_1_enable_the_google_api
  * and follow the steps in "Step 1" to create an OAuth 2.0 client for your package.
  */
-public class LoginActivity extends PlusBaseActivity implements LoaderCallbacks<Cursor>{
+public class LoginActivity extends PlusBaseActivity implements LoaderCallbacks<Cursor> {
 
     /**
      * A dummy authentication store containing known user names and passwords.
@@ -65,6 +74,7 @@ public class LoginActivity extends PlusBaseActivity implements LoaderCallbacks<C
     private View mSignOutButtons;
     private View mLoginFormView;
     private boolean can = false;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -97,7 +107,7 @@ public class LoginActivity extends PlusBaseActivity implements LoaderCallbacks<C
             @Override
             public boolean onEditorAction(TextView textView, int id, KeyEvent keyEvent) {
                 if (id == R.id.login || id == EditorInfo.IME_NULL) {
-                    attemptLogin();
+                    attemptLogin(" http://162.243.45.239/OneNote/login.php", true);
                     return true;
                 }
                 return false;
@@ -108,10 +118,24 @@ public class LoginActivity extends PlusBaseActivity implements LoaderCallbacks<C
         mEmailSignInButton.setOnClickListener(new OnClickListener() {
             @Override
             public void onClick(View view) {
-                attemptLogin();
+                attemptLogin("http://162.243.45.239/OneNote/login.php", true);
             }
         });
 
+        mEmailSignInButton.setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                attemptLogin("http://162.243.45.239/OneNote/login.php", true);
+            }
+        });
+        // TODO: create seperate rgistration page so that enter button works and code is cleaner
+        Button mEmailRegisterButton = (Button) findViewById(R.id.email_register_button);
+        mEmailRegisterButton.setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                attemptLogin("http://162.243.45.239/OneNote/registration.php", false);
+            }
+        });
         mLoginFormView = findViewById(R.id.login_form);
         mProgressView = findViewById(R.id.login_progress);
         mEmailLoginFormView = findViewById(R.id.email_login_form);
@@ -128,7 +152,7 @@ public class LoginActivity extends PlusBaseActivity implements LoaderCallbacks<C
      * If there are form errors (invalid email, missing fields, etc.), the
      * errors are presented and no actual login attempt is made.
      */
-    public void attemptLogin() {
+    public void attemptLogin(String url, Boolean isLogin) {
         if (mAuthTask != null) {
             return;
         }
@@ -165,13 +189,13 @@ public class LoginActivity extends PlusBaseActivity implements LoaderCallbacks<C
 
         if (cancel) {
             // There was an error; don't attempt login and focus the first
-             // form field with an error.
+            // form field with an error.
             focusView.requestFocus();
         } else {
             // Show a progress spinner, and kick off a background task to
             // perform the user login attempt.
             showProgress(true);
-            mAuthTask = new UserLoginTask(email, password);
+            mAuthTask = new UserLoginTask(email, password, url, isLogin);
             mAuthTask.execute((Void) null);
         }
     }
@@ -182,8 +206,9 @@ public class LoginActivity extends PlusBaseActivity implements LoaderCallbacks<C
         return email.contains("@");
 
 
+    }
 
-    };
+    ;
 
     private boolean isPasswordValid(String password) {
         //TODO: Replace this with your own logic
@@ -251,14 +276,16 @@ public class LoginActivity extends PlusBaseActivity implements LoaderCallbacks<C
     }
 
     @Override
-    protected void updateConnectButtonState() { if(can){
-        //TODO: Update this logic to also handle the user logged in by email.
-        boolean connected = getPlusClient().isConnected();
+    protected void updateConnectButtonState() {
+        if (can) {
+            //TODO: Update this logic to also handle the user logged in by email.
+            boolean connected = getPlusClient().isConnected();
 
-        mSignOutButtons.setVisibility(connected ? View.VISIBLE : View.GONE);
-        mPlusSignInButton.setVisibility(connected ? View.GONE : View.VISIBLE);
-        mEmailLoginFormView.setVisibility(connected ? View.GONE : View.VISIBLE);
-    }}
+            mSignOutButtons.setVisibility(connected ? View.VISIBLE : View.GONE);
+            mPlusSignInButton.setVisibility(connected ? View.GONE : View.VISIBLE);
+            mEmailLoginFormView.setVisibility(connected ? View.GONE : View.VISIBLE);
+        }
+    }
 
     @Override
     protected void onPlusClientRevokeAccess() {
@@ -292,7 +319,7 @@ public class LoginActivity extends PlusBaseActivity implements LoaderCallbacks<C
                 // Select only email addresses.
                 ContactsContract.Contacts.Data.MIMETYPE +
                         " = ?", new String[]{ContactsContract.CommonDataKinds.Email
-                                                                     .CONTENT_ITEM_TYPE},
+                .CONTENT_ITEM_TYPE},
 
                 // Show primary email addresses first. Note that there won't be
                 // a primary email address if the user hasn't specified one.
@@ -316,6 +343,16 @@ public class LoginActivity extends PlusBaseActivity implements LoaderCallbacks<C
 
     }
 
+    private void addEmailsToAutoComplete(List<String> emailAddressCollection) {
+        //Create adapter to tell the AutoCompleteTextView what to show in its dropdown list.
+        ArrayAdapter<String> adapter =
+                new ArrayAdapter<String>(LoginActivity.this,
+                        android.R.layout.simple_dropdown_item_1line, emailAddressCollection);
+
+        mEmailView.setAdapter(adapter);
+    }
+
+
     private interface ProfileQuery {
         String[] PROJECTION = {
                 ContactsContract.CommonDataKinds.Email.ADDRESS,
@@ -326,53 +363,78 @@ public class LoginActivity extends PlusBaseActivity implements LoaderCallbacks<C
         int IS_PRIMARY = 1;
     }
 
-
-    private void addEmailsToAutoComplete(List<String> emailAddressCollection) {
-        //Create adapter to tell the AutoCompleteTextView what to show in its dropdown list.
-        ArrayAdapter<String> adapter =
-                new ArrayAdapter<String>(LoginActivity.this,
-                        android.R.layout.simple_dropdown_item_1line, emailAddressCollection);
-
-        mEmailView.setAdapter(adapter);
-    }
-
     /**
      * Represents an asynchronous login/registration task used to authenticate
      * the user.
      */
     public class UserLoginTask extends AsyncTask<Void, Void, Boolean> {
-
+        private String errorMessage = "";
         private final String mEmail;
         private final String mPassword;
+        private final String url;
+        private final Boolean mIsLogin;
+        boolean cancel = false;
+        TextView focus = null;
 
-        UserLoginTask(String email, String password) {
+        UserLoginTask(String email, String password, String url, Boolean isLogin) {
             mEmail = email;
             mPassword = password;
+            this.url = url;
+            mIsLogin = isLogin;
         }
 
         @Override
         protected Boolean doInBackground(Void... params) {
-            // TODO: attempt authentication against a network service.
+            String id;
+            boolean cancel = false;
+            View focusView = null;
+            String urlParameters = "";
+            String result = "";
+            URL bUrl = null;
+            String line = "";
+            HttpURLConnection connection = null;
 
             try {
-                // Simulate network access.
-                Thread.sleep(2000);
-            } catch (InterruptedException e) {
-                return false;
+                bUrl = new URL(url);
+                urlParameters = "email=" + mEmail + "&password=" + mPassword;
+                Log.v("url", bUrl.toString());
+                connection = (HttpURLConnection) bUrl.openConnection();
+                connection = (HttpURLConnection) bUrl.openConnection();
+                connection.setDoOutput(true);
+                connection.setDoInput(true);
+                connection.setInstanceFollowRedirects(false);
+                connection.setRequestMethod("POST");
+                connection.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
+                connection.setRequestProperty("charset", "utf-8");
+                connection.setRequestProperty("Content-Length", "" + Integer.toString(urlParameters.getBytes().length));
+                connection.setUseCaches(false);
+                DataOutputStream wr = new DataOutputStream(connection.getOutputStream());
+                wr.writeBytes(urlParameters);
+                connection.connect();
+            } catch (IOException e1) {
+                e1.printStackTrace();
             }
-
-            for (String credential : DUMMY_CREDENTIALS) {
-                String[] pieces = credential.split(":");
-                if (pieces[0].equals(mEmail)) {
-                    // Account exists, return true if the password matches.
+            BufferedReader reader = null;
+            try {
+                reader = new BufferedReader(new InputStreamReader(connection.getInputStream()));
+                while ((line = reader.readLine()) != null)
+                    result += line;
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            if (!mIsLogin) {
+                if (result.equals("user added")) {
                     return true;
-                            //pieces[1].equals(mPassword);
+                } else {
+                    errorMessage = result;
+                    focus = mEmailView;
+                    return false;
                 }
-            }
-
-            // TODO: register the new account here.
-            return false;
+            } else
+             if()
+             return true;
         }
+
 
         @Override
         protected void onPostExecute(final Boolean success) {
@@ -380,12 +442,12 @@ public class LoginActivity extends PlusBaseActivity implements LoaderCallbacks<C
             showProgress(false);
 
             if (success) {
-                Intent intent = new Intent(LoginActivity.this,IndexPage.class);
+                Intent intent = new Intent(LoginActivity.this, IndexPage.class);
                 intent.putExtra(Intent.EXTRA_TEXT, "noteText");
                 startActivity(intent);
             } else {
-                mPasswordView.setError(getString(R.string.error_incorrect_password));
-                mPasswordView.requestFocus();
+                focus.setError(errorMessage);
+                focus.requestFocus();
             }
         }
 
